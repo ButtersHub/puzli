@@ -8,6 +8,7 @@ import { writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { createRequire } from 'module';
 import wixService from './services/wixService.js';
+import { handleGetOrdersMock } from './handlers/get_orders_mock.js';
 
 const require = createRequire(import.meta.url);
 const player = require('play-sound')({
@@ -104,16 +105,6 @@ async function playCompleteAudio(audioChunks) {
     }
 }
 
-async function getOrders() {
-    try {
-        const orders = await wixService.getOrders();
-        return orders;
-    } catch (error) {
-        console.error('Error getting orders:', error);
-        return 0; // Return 0 as fallback
-    }
-}
-
 wss.on('connection', async (ws) => {
     console.log(chalk.green('\n🔌 New client connected\n'));
     
@@ -128,6 +119,7 @@ wss.on('connection', async (ws) => {
     });
 
     openAIWs.on("open", function open() {
+        console.log("LEV -  OpenAI connected");
         console.log(chalk.green('\n🤖 Connected to OpenAI\n'));
         
         const initMessage = {
@@ -146,31 +138,63 @@ wss.on('connection', async (ws) => {
     });
 
     openAIWs.on("message", function incoming(message) {
+        console.log("LEV -  Received message:", message);
         try {
             const response = JSON.parse(message.toString());
-            logMessage('incoming', 'OpenAI Response', response);
-
+            //logMessage('incoming', 'OpenAI Response', response);
+            
+            console.log("LEV -  Response type:", response.type);
             if (response.type === 'response.function_call_arguments.done') {
+
+                console.log("LEV -  Handling function call...");
+
                 (async () => {
                     try {
-                        const orders = await getOrders();
+                        let result;
+                        switch (response.name) {
+                            case 'get_orders':
+                                result = await handleGetOrdersMock();
+                                break;
+                            // ... other cases ...
+                        }
+
+                        console.log('Function result:', result);
+
+                        const output = result || {
+                            pending: [],
+                            accepted: [],
+                            ready: [],
+                            inDelivery: []
+                        };
+
                         const functionResponse = {
                             type: 'conversation.item.create',
                             item: {
                                 type: 'function_call_output',
                                 call_id: response.call_id,
-                                output: orders
+                                output: JSON.stringify(output)
                             }
                         };
+
+                        console.log('Sending response:', JSON.stringify(functionResponse));
+
                         openAIWs.send(JSON.stringify(functionResponse));
 
-                        // Trigger assistant to generate a response
                         const responseEvent = {
                             type: 'response.create'
                         };
                         openAIWs.send(JSON.stringify(responseEvent));
                     } catch (error) {
-                        console.error('Error handling orders:', error);
+                        console.error('Error handling function call:', error);
+                        const errorResponse = {
+                            type: 'conversation.item.create',
+                            item: {
+                                type: 'function_call_output',
+                                call_id: response.call_id,
+                                output: JSON.stringify({ error: error.message })
+                            }
+                        };
+                        openAIWs.send(JSON.stringify(errorResponse));
                     }
                 })();
             }
