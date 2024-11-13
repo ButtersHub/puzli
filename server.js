@@ -15,6 +15,7 @@ import fs from 'fs';
 import path from 'path';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegStatic from 'ffmpeg-static';
+import { handleCloseRestaurant } from './handlers/close_restaurant.js';
 ffmpeg.setFfmpegPath(ffmpegStatic);
 
 const require = createRequire(import.meta.url);
@@ -103,13 +104,60 @@ async function playCompleteAudio(audioChunks) {
     }
 }
 
+// Move tools configuration to top level
+const toolsConfig = {
+    tools: [
+        {
+            type: "function",
+            name: "get_orders",                        
+            description: "Retrieves the number of orders",                                                
+            parameters: {
+                type: "object",
+                properties: {},    
+                required: []                        
+            }
+        },
+        {
+            type: "function",
+            name: "change_fulfillment_status",
+            description: "Changes the fulfillment status of an order",
+            parameters: {
+                type: "object",
+                properties: {
+                    orderId: {
+                        type: "string",
+                        description: "The ID of the order to update"
+                    },
+                    status: {
+                        type: "string",
+                        description: "The new fulfillment status",
+                        enum: ["Pending", "Accepted", "Ready", "In_Delivery"]
+                    }
+                },
+                required: ["orderId", "status"]
+            }
+        },
+        {
+            type: "function",
+            name: "close_restaurant",
+            description: "Closes the restaurant by closing all fulfillment options",
+            parameters: {
+                type: "object",
+                properties: {},
+                required: []
+            }
+        }
+    ],
+    tool_choice: "auto"
+};
+
 wss.on('connection', async (ws) => {
     console.log(chalk.green('\n🔌 New client connected\n'));
     
     let audioChunks = [];
     let isCollectingAudio = false;
     
-    const openAIWs = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview", {
+    const openAIWs = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01", {
         headers: {
             "Authorization": "Bearer " + process.env.OPENAI_API_KEY,
             "OpenAI-Beta": "realtime=v1",
@@ -125,7 +173,9 @@ wss.on('connection', async (ws) => {
             session: {
                 modalities: ["text", "audio"],
                 voice: "ash",
-                instructions: getInstructions('Dima')
+                instructions: getInstructions('Baruh'),
+                tools: toolsConfig.tools,
+                tool_choice: toolsConfig.tool_choice
             }
         };
 
@@ -136,7 +186,7 @@ wss.on('connection', async (ws) => {
     });
 
     openAIWs.on("message", function incoming(message) {
-        console.log("LEV -  Received message:", message);
+        
         try {
             const response = JSON.parse(message.toString());
             //logMessage('incoming', 'OpenAI Response', response);
@@ -156,6 +206,9 @@ wss.on('connection', async (ws) => {
                             case 'change_fulfillment_status':
                                 const args = JSON.parse(response.arguments);
                                 result = await handleChangeFulfillmentStatus(args.orderId, args.status);
+                                break;
+                            case 'close_restaurant':
+                                result = await handleCloseRestaurant();
                                 break;
                         }
 
@@ -336,41 +389,7 @@ wss.on('connection', async (ws) => {
                 // Request response with tools
                 const responseEvent = {
                     type: 'response.create',
-                    response: {
-                        tools: [
-                            {
-                                type: "function",
-                                name: "get_orders",                        
-                                description: "Retrieves the number of orders",                                                
-                                parameters: {
-                                    type: "object",
-                                    properties: {},    
-                                    required: []                        
-                                }
-                            },
-                            {
-                                type: "function",
-                                name: "change_fulfillment_status",
-                                description: "Changes the fulfillment status of an order",
-                                parameters: {
-                                    type: "object",
-                                    properties: {
-                                        orderId: {
-                                            type: "string",
-                                            description: "The ID of the order to update"
-                                        },
-                                        status: {
-                                            type: "string",
-                                            description: "The new fulfillment status",
-                                            enum: ["Pending", "Accepted", "Ready", "In_Delivery"]
-                                        }
-                                    },
-                                    required: ["orderId", "status"]
-                                }
-                            }
-                        ],
-                        tool_choice: "auto"
-                    }
+                    response: {}
                 };
                 openAIWs.send(JSON.stringify(responseEvent));
             }

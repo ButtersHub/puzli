@@ -1,0 +1,29 @@
+.assistant-selector {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f5f5f5;
+    border-radius: 8px;
+}
+
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.radio-group input[type="radio"] {
+    cursor: pointer;
+}
+
+.radio-group label:hover {
+    background: #e0e0e0;
+    border-radius: 4px;
+} 

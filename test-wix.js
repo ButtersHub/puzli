@@ -1,50 +1,42 @@
 import wixService from './services/wixService.js';
+import { handleGetOrders } from './handlers/get_orders.js';
+import { handleChangeFulfillmentStatus } from './handlers/change_fulfillment_status.js';
+import { handleCloseRestaurant } from './handlers/close_restaurant.js';
 
-async function testAllOrders() {
+async function main() {
     try {
-        const allOrders = await wixService.getOrders();
-        console.log('All orders summary:');
-        console.log('Pending orders:', allOrders.pending.length);
-        console.log('Accepted orders:', allOrders.accepted.length);
-        console.log('Ready orders:', allOrders.ready.length);
-        console.log('In Delivery orders:', allOrders.inDelivery.length);
-        
-        // If you want to see the full data
-        console.log('\nFull orders data:', JSON.stringify(allOrders, null, 2));
-    } catch (error) {
-        console.error('Test failed:', error);
-    }
-}
-
-async function testChangeOrderFulfillment() {
-    try {
-        // You can replace these with actual order IDs from your system
-        const testOrderId = "7748f05f-261b-4238-b1e1-94a1263743ed";
-        const newStatus = "Ready"; // or "Pending", "Accepted", "In_Delivery"
-
-        console.log(`Attempting to change order ${testOrderId} to status ${newStatus}...`);
-        
-        const result = await wixService.changeOrderFulfillment(testOrderId, newStatus);
-        
-        console.log('Change fulfillment result:', JSON.stringify(result, null, 2));
-    } catch (error) {
-        console.error('Test failed:', error.message);
-        if (error.response) {
-            console.error('Error response:', error.response.data);
+        // Test get orders
+  /*      console.log('\nTesting get orders:');
+        try {
+            const orders = await handleGetOrders();
+            console.log('Orders:', orders);
+        } catch (error) {
+            console.error('Error getting orders:', error);
         }
+
+        // Test change fulfillment status
+        console.log('\nTesting change fulfillment status:');
+        try {
+            const orderId = "65d4c2c4-0c7c-4a3c-8519-00c5ce4460a6";
+            const status = "Accepted";
+            const result = await handleChangeFulfillmentStatus(orderId, status);
+            console.log('Change status result:', result);
+        } catch (error) {
+            console.error('Error changing status:', error);
+        }*/
+
+        // Test close restaurant
+        console.log('\nTesting close restaurant:');
+        try {
+            const closeResult = await handleCloseRestaurant();
+            console.log('Close restaurant result:', JSON.stringify(closeResult, null, 2));
+        } catch (error) {
+            console.error('Error closing restaurant:', error);
+        }
+
+    } catch (error) {
+        console.error('Error:', error);
     }
 }
 
-async function runTests() {
-    // Existing tests
-     //await testGetPendingOrders();
-    // await testGetAcceptedOrders();
-     //await testGetReadyOrders();
-     //await testGetOutForDeliveryOrders();
-     //await testAllOrders();
-    
-    // New test
-   // await testChangeOrderFulfillment();
-}
-
-runTests(); 
+main(); 
