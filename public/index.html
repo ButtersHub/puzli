@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puzli - Kitchen Assistant</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        #chat-log {
+            height: 400px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow-y: auto;
+            margin: 20px 0;
+            padding: 15px;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #status {
+            color: #666;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #fff;
+            margin: 10px 0;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 12px;
+            border-radius: 8px;
+            max-width: 80%;
+        }
+        .user-message {
+            background-color: #007bff;
+            color: white;
+            margin-left: auto;
+        }
+        .assistant-message {
+            background-color: #e9ecef;
+            color: #212529;
+        }
+        #input-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        #message-input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #28a745;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .message.assistant-message:has(span.transcript) {
+            background-color: #f0f7ff;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>Puzli - Kitchen Assistant</h1>
+    <button id="start-button">Start Kitchen Assistant</button>
+    <div id="status">Not connected</div>
+    <div id="chat-log"></div>
+    <div id="input-container">
+        <input type="text" id="message-input" placeholder="Type your message..." disabled>
+        <button id="send-button" disabled>Send</button>
+    </div>
+
+    <script>
+        let ws;
+        let currentMessageDiv = null;
+        let currentTranscriptDiv = null;
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: 24000
+        });
+        let audioQueue = [];
+        let isPlaying = false;
+
+        function createWavData(pcmData, sampleRate) {
+            const wavHeader = new ArrayBuffer(44);
+            const view = new DataView(wavHeader);
+
+            // Write WAV header
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 32 + pcmData.length * 2, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, pcmData.length * 2, true);
+
+            // Combine header and PCM data
+            const wavData = new Uint8Array(wavHeader.byteLength + pcmData.length);
+            wavData.set(new Uint8Array(wavHeader), 0);
+            wavData.set(new Uint8Array(pcmData.buffer), wavHeader.byteLength);
+
+            return wavData;
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        async function playNext() {
+            if (isPlaying || audioQueue.length === 0) return;
+            isPlaying = true;
+
+            const audioData = audioQueue.shift();
+            const audioBuffer = audioContext.createBuffer(1, audioData.length, audioContext.sampleRate);
+            const channelData = audioBuffer.getChannelData(0);
+
+            // Convert Int16 to Float32
+            for (let i = 0; i < audioData.length; i++) {
+                channelData[i] = audioData[i] / 32768.0;
+            }
+
+            const source = audioContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(audioContext.destination);
+            source.onended = () => {
+                isPlaying = false;
+                playNext();
+            };
+            source.start(0);
+        }
+
+        const startButton = document.getElementById('start-button');
+        const status = document.getElementById('status');
+        const chatLog = document.getElementById('chat-log');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+
+        startButton.addEventListener('click', connectWebSocket);
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        function connectWebSocket() {
+            ws = new WebSocket(`ws://${window.location.host}`);
+            
+            ws.onopen = () => {
+                status.textContent = 'Connecting to assistant...';
+            };
+
+            ws.onclose = () => {
+                status.textContent = 'Disconnected';
+                messageInput.disabled = true;
+                sendButton.disabled = true;
+                startButton.disabled = false;
+            };
+
+            ws.onmessage = async (event) => {
+                const data = JSON.parse(event.data);
+                console.log('Received:', data);
+
+                if (data.type === 'status' && data.content === 'connected') {
+                    status.textContent = 'Connected';
+                    messageInput.disabled = false;
+                    sendButton.disabled = false;
+                    startButton.disabled = true;
+                }
+                else if (data.type === 'transcript') {
+                    // Show the audio transcript
+                    appendMessage('assistant', `🎙️ ${data.text}`);
+                }
+                else if (data.type === 'content_block.create' && data.content_block.type === 'text') {
+                    currentMessageDiv = appendMessage('assistant', data.content_block.text);
+                }
+                else if (data.type === 'content_block.delta' && data.delta.type === 'text_delta') {
+                    updateCurrentMessage(data.delta.text);
+                }
+                else if (data.type === 'response.audio.delta') {
+                    console.log('Audio delta received:', data.delta);
+                    const audioData = new Uint8Array(atob(data.delta.payload).split("").map(c => c.charCodeAt(0)));
+                    const wavData = createWavData(audioData, 24000);
+                    const int16Array = new Int16Array(wavData.buffer);
+                    
+                    audioQueue.push(int16Array);
+                    playNext();
+                }
+            };
+        }
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message && ws) {
+                appendMessage('user', message);
+                ws.send(message);
+                messageInput.value = '';
+                currentMessageDiv = null;
+            }
+        }
+
+        function appendMessage(sender, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', `${sender}-message`);
+            messageDiv.textContent = content;
+            chatLog.appendChild(messageDiv);
+            chatLog.scrollTop = chatLog.scrollHeight;
+            return messageDiv;
+        }
+
+        function updateCurrentMessage(text) {
+            if (currentMessageDiv) {
+                currentMessageDiv.textContent += text;
+                chatLog.scrollTop = chatLog.scrollHeight;
+            }
+        }
+    </script>
+</body>
+</html> 
