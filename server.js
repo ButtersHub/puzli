@@ -7,6 +7,7 @@ import chalk from 'chalk';
 import { writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { createRequire } from 'module';
+import wixService from './services/wixService.js';
 
 const require = createRequire(import.meta.url);
 const player = require('play-sound')({
@@ -103,8 +104,14 @@ async function playCompleteAudio(audioChunks) {
     }
 }
 
-function getOrders() {
-    return "3";
+async function getOrders() {
+    try {
+        const orders = await wixService.getOrders();
+        return orders;
+    } catch (error) {
+        console.error('Error getting orders:', error);
+        return 0; // Return 0 as fallback
+    }
 }
 
 wss.on('connection', async (ws) => {
@@ -144,22 +151,28 @@ wss.on('connection', async (ws) => {
             logMessage('incoming', 'OpenAI Response', response);
 
             if (response.type === 'response.function_call_arguments.done') {
-                const orders = getOrders();
-                const functionResponse = {
-                    type: 'conversation.item.create',
-                    item: {
-                        type: 'function_call_output',
-                        call_id: response.call_id,
-                        output: orders
-                    }
-                };
-                openAIWs.send(JSON.stringify(functionResponse));
+                (async () => {
+                    try {
+                        const orders = await getOrders();
+                        const functionResponse = {
+                            type: 'conversation.item.create',
+                            item: {
+                                type: 'function_call_output',
+                                call_id: response.call_id,
+                                output: orders
+                            }
+                        };
+                        openAIWs.send(JSON.stringify(functionResponse));
 
-                // Trigger assistant to generate a response
-                const responseEvent = {
-                    type: 'response.create'
-                };
-                openAIWs.send(JSON.stringify(responseEvent));
+                        // Trigger assistant to generate a response
+                        const responseEvent = {
+                            type: 'response.create'
+                        };
+                        openAIWs.send(JSON.stringify(responseEvent));
+                    } catch (error) {
+                        console.error('Error handling orders:', error);
+                    }
+                })();
             }
             // Handle audio data
             else if (response.type === 'response.audio.delta') {
