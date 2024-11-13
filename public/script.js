@@ -1,42 +1,49 @@
-const ws = new WebSocket(`ws://${window.location.host}`);
-const chatMessages = document.getElementById('chat-messages');
-const userInput = document.getElementById('user-input');
-const sendButton = document.getElementById('send-button');
-const startButton = document.getElementById('start-button');
+document.addEventListener('DOMContentLoaded', () => {
+    let ws;
+    const startButton = document.getElementById('start-button');
+    const status = document.getElementById('status');
+    const chatLog = document.getElementById('chat-log');
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+    const recordButton = document.getElementById('record-button');
 
-ws.onopen = () => {
-    console.log('Connected to server');
-};
+    startButton.addEventListener('click', connectWebSocket);
+    sendButton.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessage();
+    });
 
-// Add event listener for the start button
-startButton.addEventListener('click', () => {
-    const selectedChef = document.querySelector('input[name="chef"]:checked').value;
-    console.log('Selected chef:', selectedChef);  // Debug log
-    
-    ws.send(JSON.stringify({
-        type: 'init',
-        chef: selectedChef
-    }));
-});
+    function connectWebSocket() {
+        ws = new WebSocket(`ws://${window.location.host}`);
+        
+        ws.onopen = () => {
+            status.textContent = 'Connecting to assistant...';
+        };
 
-ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    // ... rest of your existing message handling code ...
-};
+        ws.onclose = () => {
+            status.textContent = 'Disconnected';
+            messageInput.disabled = true;
+            sendButton.disabled = true;
+            recordButton.disabled = true;
+            startButton.disabled = false;
+        };
 
-sendButton.addEventListener('click', sendMessage);
-userInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        sendMessage();
+        ws.onmessage = async (event) => {
+            const data = JSON.parse(event.data);
+            console.log('Received:', data);
+
+            if (data.type === 'status' && data.content === 'connected') {
+                status.textContent = 'Connected';
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                recordButton.disabled = false;
+                startButton.disabled = true;
+            }
+            // ... rest of your message handling code
+        };
     }
-});
 
-function sendMessage() {
-    const message = userInput.value.trim();
-    if (message) {
-        ws.send(message);
-        userInput.value = '';
-    }
-}
+    // ... rest of your code
+});
 
 // Rest of your existing WebSocket handling code... 

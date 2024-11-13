@@ -85,6 +85,7 @@
     <div id="input-container">
         <input type="text" id="message-input" placeholder="Type your message..." disabled>
         <button id="send-button" disabled>Send</button>
+        <button id="record-button" disabled>🎤</button>
     </div>
 
     <script>
@@ -158,9 +159,11 @@
         const chatLog = document.getElementById('chat-log');
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
+        const recordButton = document.getElementById('record-button');
 
         startButton.addEventListener('click', connectWebSocket);
         sendButton.addEventListener('click', sendMessage);
+        recordButton.addEventListener('click', toggleRecord);
         messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') sendMessage();
         });
@@ -176,6 +179,7 @@
                 status.textContent = 'Disconnected';
                 messageInput.disabled = true;
                 sendButton.disabled = true;
+                recordButton.disabled = true;
                 startButton.disabled = false;
             };
 
@@ -187,6 +191,7 @@
                     status.textContent = 'Connected';
                     messageInput.disabled = false;
                     sendButton.disabled = false;
+                    recordButton.disabled = false;
                     startButton.disabled = true;
                 }
                 else if (data.type === 'transcript') {
@@ -234,6 +239,16 @@
             if (currentMessageDiv) {
                 currentMessageDiv.textContent += text;
                 chatLog.scrollTop = chatLog.scrollHeight;
+            }
+        }
+
+        function toggleRecord() {
+            if (recordButton.disabled) {
+                recordButton.disabled = false;
+                recordButton.textContent = '🎙️';
+            } else {
+                recordButton.disabled = true;
+                recordButton.textContent = '🔴';
             }
         }
     </script>
