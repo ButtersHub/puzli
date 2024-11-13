@@ -412,6 +412,68 @@ class WixService {
             throw error;
         }
     }
+
+    async changeOrderFulfillment(orderId, newStatus) {
+        try {
+            // 1. First API call - Get fulfillments information
+            const fulfillmentsResponse = await axios.get(
+                `${this.apiUrl}/ecom/v1/fulfillments/orders/${orderId}`,
+                {
+                    headers: {
+                        'Authorization': this.apiKey,
+                        'wix-account-id': process.env.WIX_ACCOUNT_ID,
+                        'wix-site-id': process.env.WIX_SITE_ID,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            console.log('Fulfillments response:', JSON.stringify(fulfillmentsResponse.data, null, 2));
+
+            // Check if fulfillments exist and get the first fulfillment ID
+            if (!fulfillmentsResponse.data.orderWithFulfillments?.fulfillments || 
+                fulfillmentsResponse.data.orderWithFulfillments.fulfillments.length === 0) {
+                throw new Error('No fulfillments found for this order');
+            }
+
+            const fulfillmentId = fulfillmentsResponse.data.orderWithFulfillments.fulfillments[0].id;
+            console.log('Found fulfillment ID:', fulfillmentId);
+
+            // 2. Second API call - Update fulfillment status
+            const updateResponse = await axios.patch(
+                `${this.apiUrl}/ecom/v1/fulfillments/${fulfillmentId}/orders/${orderId}`,
+                {
+                    orderId: orderId,
+                    fulfillment: {
+                        id: fulfillmentId,
+                        status: newStatus,
+                        completed: false
+                    },
+                    fieldMask: "status,completed"
+                },
+                {
+                    headers: {
+                        'Authorization': this.apiKey,
+                        'wix-account-id': process.env.WIX_ACCOUNT_ID,
+                        'wix-site-id': process.env.WIX_SITE_ID,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            return {
+                success: true,
+                message: `Successfully updated order ${orderId} to status ${newStatus}`,
+                fulfillmentId: fulfillmentId,
+                updatedStatus: newStatus,
+                currentStatus: fulfillmentsResponse.data.orderWithFulfillments.fulfillments[0].status
+            };
+
+        } catch (error) {
+            console.error('Error changing order fulfillment:', error);
+            throw error;
+        }
+    }
 }
 
 export default new WixService(); 

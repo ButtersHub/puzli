@@ -10,6 +10,7 @@ import { createRequire } from 'module';
 import wixService from './services/wixService.js';
 import { handleGetOrders } from './handlers/get_orders.js';
 import { getInstructions } from './constants/instructions.js';
+import { handleChangeFulfillmentStatus } from './handlers/change_fulfillment_status.js';
 
 const require = createRequire(import.meta.url);
 const player = require('play-sound')({
@@ -113,7 +114,7 @@ wss.on('connection', async (ws) => {
             session: {
                 modalities: ["text", "audio"],
                 voice: "ash",
-                instructions: getInstructions('Ahmed')
+                instructions: getInstructions('Puzli')
             }
         };
 
@@ -141,7 +142,10 @@ wss.on('connection', async (ws) => {
                             case 'get_orders':
                                 result = await handleGetOrders();
                                 break;
-                            // ... other cases ...
+                            case 'change_fulfillment_status':
+                                const args = JSON.parse(response.arguments);
+                                result = await handleChangeFulfillmentStatus(args.orderId, args.status);
+                                break;
                         }
 
                         console.log('Function result:', result);
@@ -241,16 +245,38 @@ wss.on('connection', async (ws) => {
             const responseEvent = {
                 type: 'response.create',
                 response: {
-                    tools: [{
-                        type: "function",
-                        name: "get_orders",                        
-                        description: "Retrieves the number of orders",                                                
-                        parameters: {
-                            type: "object",
-                            properties: {},    
-                            required: []                        
+                    tools: [
+                        {
+                            type: "function",
+                            name: "get_orders",                        
+                            description: "Retrieves the number of orders",                                                
+                            parameters: {
+                                type: "object",
+                                properties: {},    
+                                required: []                        
+                            }
+                        },
+                        {
+                            type: "function",
+                            name: "change_fulfillment_status",
+                            description: "Changes the fulfillment status of an order",
+                            parameters: {
+                                type: "object",
+                                properties: {
+                                    orderId: {
+                                        type: "string",
+                                        description: "The ID of the order to update"
+                                    },
+                                    status: {
+                                        type: "string",
+                                        description: "The new fulfillment status",
+                                        enum: ["Pending", "Accepted", "Ready", "In_Delivery"]
+                                    }
+                                },
+                                required: ["orderId", "status"]
+                            }
                         }
-                    }],
+                    ],
                     tool_choice: "auto"
                 }
             };
