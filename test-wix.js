@@ -37,14 +37,14 @@ async function testChangeOrderFulfillment() {
 
 async function runTests() {
     // Existing tests
-    // await testGetPendingOrders();
+     //await testGetPendingOrders();
     // await testGetAcceptedOrders();
-    // await testGetReadyOrders();
-    // await testGetOutForDeliveryOrders();
-    // await testGetOrders();
+     //await testGetReadyOrders();
+     //await testGetOutForDeliveryOrders();
+     //await testAllOrders();
     
     // New test
-    await testChangeOrderFulfillment();
+   // await testChangeOrderFulfillment();
 }
 
 runTests(); 

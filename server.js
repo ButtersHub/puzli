@@ -13,6 +13,9 @@ import { getInstructions } from './constants/instructions.js';
 import { handleChangeFulfillmentStatus } from './handlers/change_fulfillment_status.js';
 import fs from 'fs';
 import path from 'path';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegStatic from 'ffmpeg-static';
+ffmpeg.setFfmpegPath(ffmpegStatic);
 
 const require = createRequire(import.meta.url);
 const player = require('play-sound')({
@@ -55,12 +58,12 @@ function createWavHeader(pcmDataLength) {
     // "fmt " sub-chunk
     header.write('fmt ', 12);
     header.writeUInt32LE(16, 16);
-    header.writeUInt16LE(1, 20);
-    header.writeUInt16LE(1, 22);
-    header.writeUInt32LE(24000, 24);
-    header.writeUInt32LE(24000 * 2, 28);
-    header.writeUInt16LE(2, 32);
-    header.writeUInt16LE(16, 34);
+    header.writeUInt16LE(1, 20);           // PCM format
+    header.writeUInt16LE(1, 22);           // Mono channel
+    header.writeUInt32LE(24000, 24);       // Sample rate
+    header.writeUInt32LE(24000 * 2, 28);   // Byte rate
+    header.writeUInt16LE(2, 32);           // Block align
+    header.writeUInt16LE(16, 34);          // Bits per sample
     
     // "data" sub-chunk
     header.write('data', 36);
@@ -122,7 +125,7 @@ wss.on('connection', async (ws) => {
             session: {
                 modalities: ["text", "audio"],
                 voice: "ash",
-                instructions: getInstructions('Puzli')
+                instructions: getInstructions('Dima')
             }
         };
 
@@ -226,17 +229,18 @@ wss.on('connection', async (ws) => {
 
     ws.on('message', async (message) => {
         try {
-            const data = JSON.parse(message);
+            console.log('Received message:', message.toString());
+            
+            let data;
+            try {
+                data = JSON.parse(message);
+            } catch {
+                // If parsing fails, treat it as a plain text message
+                data = { type: 'text', content: message.toString() };
+            }
             
             if (data.type === 'audio') {
-                console.log('Received audio data:', {
-                    type: data.type,
-                    hasData: !!data.data,
-                    filename: data.filename  // Log to check if filename exists
-                });
-                
-                // Generate filename if not provided
-                const filename = data.filename || `recording_${Date.now()}.wav`;
+                console.log('Received audio data');
                 
                 // Create uploads directory if it doesn't exist
                 const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -248,6 +252,7 @@ wss.on('connection', async (ws) => {
                 const audioBuffer = Buffer.from(data.data, 'base64');
                 
                 // Create filepath
+                const filename = data.filename || `recording_${Date.now()}.wav`;
                 const filepath = path.join(uploadsDir, filename);
                 
                 // Save file
@@ -260,6 +265,26 @@ wss.on('connection', async (ws) => {
                     content: `Audio saved as ${filename}`
                 }));
 
+                // Convert audio to the required format using ffmpeg
+                const outputPath = path.join(uploadsDir, `converted_${filename}`);
+                
+                await new Promise((resolve, reject) => {
+                    ffmpeg(filepath)
+                        .toFormat('wav')
+                        .audioChannels(1)
+                        .audioFrequency(24000)
+                        .on('end', resolve)
+                        .on('error', reject)
+                        .save(outputPath);
+                });
+
+                // Read the converted file and send to OpenAI
+                const audioData = fs.readFileSync(outputPath);
+                const base64AudioData = audioData.slice(44).toString('base64');  // Skip WAV header
+
+                // Clean up temporary files
+                fs.unlinkSync(outputPath);
+
                 // Continue with OpenAI processing
                 const audioEvent = {
                     type: 'conversation.item.create',
@@ -269,7 +294,7 @@ wss.on('connection', async (ws) => {
                         content: [
                             {
                                 type: 'input_audio',
-                                audio: data.data
+                                audio: base64AudioData
                             }
                         ]
                     }
@@ -285,7 +310,7 @@ wss.on('connection', async (ws) => {
                 openAIWs.send(JSON.stringify(responseEvent));
 
             } else {
-                const userMessage = data.toString();
+                const userMessage = data.type === 'text' ? data.content : data.toString();
                 logMessage('incoming', 'User Message', userMessage);
                 
                 // Reset audio chunks for new message

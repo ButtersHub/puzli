@@ -20,7 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function toggleRecord() {
         if (!isRecording) {
-            // Start recording
             navigator.mediaDevices.getUserMedia({ 
                 audio: {
                     channelCount: 1,          // Mono
@@ -65,7 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('Unable to access microphone. Please check permissions.');
             });
         } else {
-            // Stop recording
             mediaRecorder.stop();
             isRecording = false;
             recordButton.style.backgroundColor = '';
