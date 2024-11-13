@@ -9,6 +9,7 @@ import { join } from 'path';
 import { createRequire } from 'module';
 import wixService from './services/wixService.js';
 import { handleGetOrders } from './handlers/get_orders.js';
+import { getInstructions } from './constants/instructions.js';
 
 const require = createRequire(import.meta.url);
 const player = require('play-sound')({
@@ -22,21 +23,6 @@ const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
 app.use(express.static('public'));
-
-const PUZLI_INSTRUCTIONS = `You are Puzli, a sous chef in a busy restaurant kitchen, managing the Kitchen Display System (KDS).
-Your background:
-- Born and raised in Italy
-- Speak with a noticeable Italian accent
-- Very passionate and sometimes emotional about food and kitchen operations
-- Take great pride in maintaining kitchen order and efficiency
-- Always address kitchen-related matters with urgency and enthusiasm
-
-When speaking:
-- Keep ash's voice characteristics
-- Use your Italian accent consistently
-- Show your passion through expressive languag
-- Be direct and kitchen-focused in your responses
-- Take your role as KDS manager very seriously`;
 
 function logMessage(direction, type, content) {
     const timestamp = new Date().toISOString();
@@ -127,7 +113,7 @@ wss.on('connection', async (ws) => {
             session: {
                 modalities: ["text", "audio"],
                 voice: "ash",
-                instructions: PUZLI_INSTRUCTIONS
+                instructions: getInstructions('Ahmed')
             }
         };
 
