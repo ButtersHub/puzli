@@ -16,6 +16,8 @@ import path from 'path';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegStatic from 'ffmpeg-static';
 import { handleCloseRestaurant } from './handlers/close_restaurant.js';
+import { handleOpenRestaurant } from './handlers/open_restaurant.js';
+import { handleSetItemOutOfStock } from './handlers/set_item_out_of_stock.js';
 ffmpeg.setFfmpegPath(ffmpegStatic);
 
 const require = createRequire(import.meta.url);
@@ -146,6 +148,31 @@ const toolsConfig = {
                 properties: {},
                 required: []
             }
+        },
+        {
+            type: "function",
+            name: "open_restaurant",
+            description: "Opens the restaurant by enabling all fulfillment options",
+            parameters: {
+                type: "object",
+                properties: {},
+                required: []
+            }
+        },
+        {
+            type: "function",
+            name: "set_item_out_of_stock",
+            description: "Sets a menu item as out of stock by its name",
+            parameters: {
+                type: "object",
+                properties: {
+                    itemName: {
+                        type: "string",
+                        description: "The name of the menu item to set as out of stock"
+                    }
+                },
+                required: ["itemName"]
+            }
         }
     ],
     tool_choice: "auto"
@@ -209,6 +236,13 @@ wss.on('connection', async (ws) => {
                                 break;
                             case 'close_restaurant':
                                 result = await handleCloseRestaurant();
+                                break;
+                            case 'open_restaurant':
+                                result = await handleOpenRestaurant();
+                                break;
+                            case 'set_item_out_of_stock':
+                                const setStockArgs = JSON.parse(response.arguments);
+                                result = await handleSetItemOutOfStock(setStockArgs.itemName);
                                 break;
                         }
 
