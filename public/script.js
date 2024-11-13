@@ -1,14 +1,15 @@
 document.addEventListener('DOMContentLoaded', () => {
     let ws;
+    let isRecording = false;
+    let mediaRecorder = null;
+    let audioChunks = [];
+
     const startButton = document.getElementById('start-button');
     const status = document.getElementById('status');
     const chatLog = document.getElementById('chat-log');
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
     const recordButton = document.getElementById('record-button');
-    let mediaRecorder;
-    let audioChunks = [];
-    let isRecording = false;
 
     startButton.addEventListener('click', connectWebSocket);
     sendButton.addEventListener('click', sendMessage);
@@ -17,12 +18,66 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     recordButton.addEventListener('click', toggleRecord);
 
+    function toggleRecord() {
+        if (!isRecording) {
+            // Start recording
+            navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    channelCount: 1,          // Mono
+                    sampleRate: 24000         // 24kHz
+                }
+            })
+            .then(stream => {
+                console.log('Got media stream');
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                    console.log('Audio chunk added');
+                };
+
+                mediaRecorder.onstop = async () => {
+                    console.log('Recording stopped, processing audio...');
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const arrayBuffer = await audioBlob.arrayBuffer();
+                    const base64Audio = btoa(
+                        String.fromCharCode.apply(null, new Uint8Array(arrayBuffer))
+                    );
+
+                    const filename = `recording_${Date.now()}.wav`;
+                    console.log('Sending audio to server with filename:', filename);
+                    
+                    ws.send(JSON.stringify({
+                        type: 'audio',
+                        data: base64Audio,
+                        filename: filename
+                    }));
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordButton.style.backgroundColor = 'red';
+                console.log('Recording started');
+            })
+            .catch(error => {
+                console.error('Error accessing microphone:', error);
+                alert('Unable to access microphone. Please check permissions.');
+            });
+        } else {
+            // Stop recording
+            mediaRecorder.stop();
+            isRecording = false;
+            recordButton.style.backgroundColor = '';
+            console.log('Recording stopped');
+        }
+    }
+
     function connectWebSocket() {
         ws = new WebSocket(`ws://${window.location.host}`);
         
         ws.onopen = () => {
             status.textContent = 'Connecting to assistant...';
-            recordButton.disabled = true;
         };
 
         ws.onclose = () => {
@@ -44,64 +99,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 recordButton.disabled = false;
                 startButton.disabled = true;
             }
-            // ... rest of your message handling code
+
+            if (data.type === 'message') {
+                const messageDiv = document.createElement('div');
+                messageDiv.textContent = data.content;
+                chatLog.appendChild(messageDiv);
+                chatLog.scrollTop = chatLog.scrollHeight;
+            }
         };
     }
 
-    async function toggleRecord() {
-        if (!isRecording) {
-            try {
-                // Request microphone access
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
-                // Create new MediaRecorder instance
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-
-                // Handle data available event
-                mediaRecorder.ondataavailable = (event) => {
-                    audioChunks.push(event.data);
-                };
-
-                // Handle recording stop
-                mediaRecorder.onstop = async () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                    // Convert to base64 and send to server
-                    const reader = new FileReader();
-                    reader.readAsDataURL(audioBlob);
-                    reader.onloadend = () => {
-                        const base64Audio = reader.result.split(',')[1];
-                        ws.send(JSON.stringify({
-                            type: 'audio',
-                            data: base64Audio
-                        }));
-                    };
-                    // Re-enable the record button after sending
-                    recordButton.disabled = false;
-                    recordButton.style.backgroundColor = '';  // Reset button color
-                };
-
-                // Start recording
-                mediaRecorder.start();
-                isRecording = true;
-                recordButton.style.backgroundColor = 'red';  // Visual feedback
-                console.log('Recording started');
-
-            } catch (error) {
-                console.error('Error accessing microphone:', error);
-                alert('Unable to access microphone. Please check permissions.');
-                recordButton.disabled = false;  // Re-enable on error
-            }
-        } else {
-            // Stop recording
-            mediaRecorder.stop();
-            isRecording = false;
-            recordButton.disabled = true;  // Temporarily disable while processing
-            console.log('Recording stopped');
+    function sendMessage() {
+        const message = messageInput.value.trim();
+        if (message) {
+            ws.send(message);
+            messageInput.value = '';
         }
     }
-
-    // ... rest of your code
 });
 
 // Rest of your existing WebSocket handling code... 

@@ -11,6 +11,8 @@ import wixService from './services/wixService.js';
 import { handleGetOrders } from './handlers/get_orders.js';
 import { getInstructions } from './constants/instructions.js';
 import { handleChangeFulfillmentStatus } from './handlers/change_fulfillment_status.js';
+import fs from 'fs';
+import path from 'path';
 
 const require = createRequire(import.meta.url);
 const player = require('play-sound')({
@@ -24,6 +26,12 @@ const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
 app.use(express.static('public'));
+
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)){
+    fs.mkdirSync(uploadsDir);
+}
 
 function logMessage(direction, type, content) {
     const timestamp = new Date().toISOString();
@@ -218,75 +226,138 @@ wss.on('connection', async (ws) => {
 
     ws.on('message', async (message) => {
         try {
-            const userMessage = message.toString();
-            logMessage('incoming', 'User Message', userMessage);
+            const data = JSON.parse(message);
             
-            // Reset audio chunks for new message
-            audioChunks = [];
-            isCollectingAudio = false;
-            
-            // Add user message to conversation
-            const conversationEvent = {
-                type: 'conversation.item.create',
-                item: {
-                    type: 'message',
-                    role: 'user',
-                    content: [
-                        {
-                            type: 'input_text',
-                            text: userMessage
-                        }
-                    ]
+            if (data.type === 'audio') {
+                console.log('Received audio data:', {
+                    type: data.type,
+                    hasData: !!data.data,
+                    filename: data.filename  // Log to check if filename exists
+                });
+                
+                // Generate filename if not provided
+                const filename = data.filename || `recording_${Date.now()}.wav`;
+                
+                // Create uploads directory if it doesn't exist
+                const uploadsDir = path.join(process.cwd(), 'uploads');
+                if (!fs.existsSync(uploadsDir)){
+                    fs.mkdirSync(uploadsDir);
                 }
-            };
-            openAIWs.send(JSON.stringify(conversationEvent));
+                
+                // Decode base64 to buffer
+                const audioBuffer = Buffer.from(data.data, 'base64');
+                
+                // Create filepath
+                const filepath = path.join(uploadsDir, filename);
+                
+                // Save file
+                fs.writeFileSync(filepath, audioBuffer);
+                console.log(`Audio saved to: ${filepath}`);
 
-            // Request response with tools
-            const responseEvent = {
-                type: 'response.create',
-                response: {
-                    tools: [
-                        {
-                            type: "function",
-                            name: "get_orders",                        
-                            description: "Retrieves the number of orders",                                                
-                            parameters: {
-                                type: "object",
-                                properties: {},    
-                                required: []                        
+                // Send confirmation to client
+                ws.send(JSON.stringify({
+                    type: 'status',
+                    content: `Audio saved as ${filename}`
+                }));
+
+                // Continue with OpenAI processing
+                const audioEvent = {
+                    type: 'conversation.item.create',
+                    item: {
+                        type: 'message',
+                        role: 'user',
+                        content: [
+                            {
+                                type: 'input_audio',
+                                audio: data.data
                             }
-                        },
-                        {
-                            type: "function",
-                            name: "change_fulfillment_status",
-                            description: "Changes the fulfillment status of an order",
-                            parameters: {
-                                type: "object",
-                                properties: {
-                                    orderId: {
-                                        type: "string",
-                                        description: "The ID of the order to update"
+                        ]
+                    }
+                };
+
+                logMessage('outgoing', 'Send Audio', audioEvent);
+                openAIWs.send(JSON.stringify(audioEvent));
+                
+                // Send response.create event
+                const responseEvent = {
+                    type: 'response.create'
+                };
+                openAIWs.send(JSON.stringify(responseEvent));
+
+            } else {
+                const userMessage = data.toString();
+                logMessage('incoming', 'User Message', userMessage);
+                
+                // Reset audio chunks for new message
+                audioChunks = [];
+                isCollectingAudio = false;
+                
+                // Add user message to conversation
+                const conversationEvent = {
+                    type: 'conversation.item.create',
+                    item: {
+                        type: 'message',
+                        role: 'user',
+                        content: [
+                            {
+                                type: 'input_text',
+                                text: userMessage
+                            }
+                        ]
+                    }
+                };
+                openAIWs.send(JSON.stringify(conversationEvent));
+
+                // Request response with tools
+                const responseEvent = {
+                    type: 'response.create',
+                    response: {
+                        tools: [
+                            {
+                                type: "function",
+                                name: "get_orders",                        
+                                description: "Retrieves the number of orders",                                                
+                                parameters: {
+                                    type: "object",
+                                    properties: {},    
+                                    required: []                        
+                                }
+                            },
+                            {
+                                type: "function",
+                                name: "change_fulfillment_status",
+                                description: "Changes the fulfillment status of an order",
+                                parameters: {
+                                    type: "object",
+                                    properties: {
+                                        orderId: {
+                                            type: "string",
+                                            description: "The ID of the order to update"
+                                        },
+                                        status: {
+                                            type: "string",
+                                            description: "The new fulfillment status",
+                                            enum: ["Pending", "Accepted", "Ready", "In_Delivery"]
+                                        }
                                     },
-                                    status: {
-                                        type: "string",
-                                        description: "The new fulfillment status",
-                                        enum: ["Pending", "Accepted", "Ready", "In_Delivery"]
-                                    }
-                                },
-                                required: ["orderId", "status"]
+                                    required: ["orderId", "status"]
+                                }
                             }
-                        }
-                    ],
-                    tool_choice: "auto"
-                }
-            };
-            openAIWs.send(JSON.stringify(responseEvent));
-
+                        ],
+                        tool_choice: "auto"
+                    }
+                };
+                openAIWs.send(JSON.stringify(responseEvent));
+            }
         } catch (error) {
-            console.error(chalk.red('\n❌ Error processing message:'), error);
+            console.error('Error processing message:', error);
+            console.error('Error details:', {
+                message: error.message,
+                stack: error.stack
+            });
             ws.send(JSON.stringify({
                 type: 'error',
-                content: error.message
+                message: 'Error processing message'
             }));
         }
     });
