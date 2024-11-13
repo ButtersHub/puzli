@@ -8,7 +8,7 @@ import { writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { createRequire } from 'module';
 import wixService from './services/wixService.js';
-import { handleGetOrdersMock } from './handlers/get_orders_mock.js';
+import { handleGetOrders } from './handlers/get_orders.js';
 
 const require = createRequire(import.meta.url);
 const player = require('play-sound')({
@@ -153,26 +153,19 @@ wss.on('connection', async (ws) => {
                         let result;
                         switch (response.name) {
                             case 'get_orders':
-                                result = await handleGetOrdersMock();
+                                result = await handleGetOrders();
                                 break;
                             // ... other cases ...
                         }
 
                         console.log('Function result:', result);
 
-                        const output = result || {
-                            pending: [],
-                            accepted: [],
-                            ready: [],
-                            inDelivery: []
-                        };
-
                         const functionResponse = {
                             type: 'conversation.item.create',
                             item: {
                                 type: 'function_call_output',
                                 call_id: response.call_id,
-                                output: JSON.stringify(output)
+                                output: JSON.stringify(result)
                             }
                         };
 
