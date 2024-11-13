@@ -2,6 +2,7 @@ import wixService from './services/wixService.js';
 import { handleGetOrders } from './handlers/get_orders.js';
 import { handleChangeFulfillmentStatus } from './handlers/change_fulfillment_status.js';
 import { handleCloseRestaurant } from './handlers/close_restaurant.js';
+import { handleOpenRestaurant } from './handlers/open_restaurant.js';
 
 async function main() {
     try {
@@ -23,8 +24,8 @@ async function main() {
             console.log('Change status result:', result);
         } catch (error) {
             console.error('Error changing status:', error);
-        }*/
-
+        }
+*/
         // Test close restaurant
         console.log('\nTesting close restaurant:');
         try {
@@ -33,6 +34,15 @@ async function main() {
         } catch (error) {
             console.error('Error closing restaurant:', error);
         }
+
+        // Test open restaurant
+      /*  console.log('\nTesting open restaurant:');
+        try {
+            const openResult = await handleOpenRestaurant();
+            console.log('Open restaurant result:', JSON.stringify(openResult, null, 2));
+        } catch (error) {
+            console.error('Error opening restaurant:', error);
+        }*/
 
     } catch (error) {
         console.error('Error:', error);

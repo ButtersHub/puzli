@@ -91,10 +91,53 @@
         #record-button:not(:disabled):hover {
             background-color: #218838;
         }
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 30px;
+            padding: 20px 0;
+        }
+        .puzli-image {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border: 3px solid #28a745;
+            animation: fadeIn 0.5s ease-out;
+        }
+        .title-container {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .title-container h1 {
+            margin: 0;
+            font-size: 2.5em;
+            color: #2c3e50;
+        }
+        .title-container h2 {
+            margin: 0;
+            font-size: 1.5em;
+            color: #7f8c8d;
+            font-weight: normal;
+            font-style: italic;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
-    <h1>Puzli - Kitchen Assistant</h1>
+    <div class="header">
+        <img src="images/puzli.webp" alt="Puzli" class="puzli-image">
+        <div class="title-container">
+            <h1>Puzli</h1>
+            <h2>The Sous Chef</h2>
+        </div>
+    </div>
     <button id="start-button">Start Kitchen Assistant</button>
     <div id="status">Not connected</div>
     <div id="chat-log"></div>
