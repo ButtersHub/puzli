@@ -4,6 +4,7 @@ import { handleChangeFulfillmentStatus } from './handlers/change_fulfillment_sta
 import { handleCloseRestaurant } from './handlers/close_restaurant.js';
 import { handleOpenRestaurant } from './handlers/open_restaurant.js';
 import { handleSetItemOutOfStock } from './handlers/set_item_out_of_stock.js';
+import { handleChangeDeliveryArea } from './handlers/change_delivery_area.js';
 
 async function main() {
     try {
@@ -45,15 +46,25 @@ async function main() {
             console.error('Error opening restaurant:', error);
         }
 */
+        // Test change delivery area
+        console.log('\nTesting change delivery area:');
+        try {
+            const areas = ['Tel Aviv'];
+            const deliveryResult = await handleChangeDeliveryArea({ areas });
+            console.log('Change delivery area result:', JSON.stringify(deliveryResult, null, 2));
+        } catch (error) {
+            console.error('Error changing delivery area:', error);
+        }
+
         // Test set item out of stock
-        console.log('\nTesting set item out of stock:');
+     /*   console.log('\nTesting set item out of stock:');
         try {
             const itemName = "Fish of the day";
             const setStockResult = await handleSetItemOutOfStock(itemName);
             console.log('Set item out of stock result:', JSON.stringify(setStockResult, null, 2));
         } catch (error) {
             console.error('Error setting item out of stock:', error);
-        }
+        }*/
 
     } catch (error) {
         console.error('Error:', error);

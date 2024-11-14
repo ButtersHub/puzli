@@ -18,6 +18,7 @@ import ffmpegStatic from 'ffmpeg-static';
 import { handleCloseRestaurant } from './handlers/close_restaurant.js';
 import { handleOpenRestaurant } from './handlers/open_restaurant.js';
 import { handleSetItemOutOfStock } from './handlers/set_item_out_of_stock.js';
+import { handleChangeDeliveryArea } from './handlers/change_delivery_area.js';
 ffmpeg.setFfmpegPath(ffmpegStatic);
 
 const require = createRequire(import.meta.url);
@@ -175,6 +176,24 @@ const toolsConfig = {
                 },
                 required: ["itemName"]
             }
+        },
+        {
+            type: "function",
+            name: "change_delivery_area",
+            description: "Updates the restaurant's delivery areas",
+            parameters: {
+                type: "object",
+                properties: {
+                    areas: {
+                        type: "array",
+                        items: {
+                            type: "string"
+                        },
+                        description: "List of delivery areas to set (e.g., ['Tel Aviv', 'Ramat Gan', 'Givatayim'])"
+                    }
+                },
+                required: ["areas"]
+            }
         }
     ],
     tool_choice: "auto"
@@ -245,6 +264,10 @@ wss.on('connection', async (ws) => {
                             case 'set_item_out_of_stock':
                                 const setStockArgs = JSON.parse(response.arguments);
                                 result = await handleSetItemOutOfStock(setStockArgs.itemName);
+                                break;
+                            case 'change_delivery_area':
+                                const deliveryAreaArgs = JSON.parse(response.arguments);
+                                result = await handleChangeDeliveryArea(deliveryAreaArgs);
                                 break;
                         }
 
