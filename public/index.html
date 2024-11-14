@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Puzli - Kitchen Assistant</title>
+    <link rel="icon" type="image/webp" href="images/puzli.webp">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -190,6 +191,20 @@
             50% { height: 25px; }
             100% { height: 5px; }
         }
+
+        .message-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        .assistant-message {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
@@ -370,7 +385,19 @@
         function appendMessage(sender, content) {
             const messageDiv = document.createElement('div');
             messageDiv.classList.add('message', `${sender}-message`);
-            messageDiv.textContent = content;
+            
+            const imgSpan = document.createElement('span');
+            if (sender === 'assistant') {
+                imgSpan.innerHTML = '<img src="images/puzli.webp" class="message-avatar" alt="Puzli">';
+            } else {
+                imgSpan.innerHTML = '<img src="images/Lev.webp" class="message-avatar" alt="Lev">';
+            }
+            messageDiv.appendChild(imgSpan);
+            
+            const textSpan = document.createElement('span');
+            textSpan.textContent = content.replace('🎙️', '');
+            messageDiv.appendChild(textSpan);
+            
             chatLog.appendChild(messageDiv);
             chatLog.scrollTop = chatLog.scrollHeight;
             return messageDiv;
