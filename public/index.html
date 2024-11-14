@@ -128,6 +128,68 @@
             from { opacity: 0; transform: translateY(-20px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        .controls-container {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .sound-waves {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 3px;
+            height: 30px;
+            padding: 5px 15px;
+            background: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .sound-waves.hidden {
+            display: none;
+        }
+
+        .sound-waves .bar {
+            width: 3px;
+            min-height: 2px;
+            border-radius: 2px;
+            animation: soundWave 1s ease-in-out infinite;
+        }
+
+        .sound-waves .bar.green:nth-child(1) { 
+            background: #009246;
+            animation-delay: 0.0s; 
+        }
+        .sound-waves .bar.green:nth-child(2) { 
+            background: #009246;
+            animation-delay: 0.1s; 
+        }
+        .sound-waves .bar.white:nth-child(3) { 
+            background: #ffffff;
+            border: 1px solid #ddd;
+            animation-delay: 0.2s; 
+        }
+        .sound-waves .bar.white:nth-child(4) { 
+            background: #ffffff;
+            border: 1px solid #ddd;
+            animation-delay: 0.3s; 
+        }
+        .sound-waves .bar.red:nth-child(5) { 
+            background: #ce2b37;
+            animation-delay: 0.4s; 
+        }
+        .sound-waves .bar.red:nth-child(6) { 
+            background: #ce2b37;
+            animation-delay: 0.5s; 
+        }
+
+        @keyframes soundWave {
+            0% { height: 5px; }
+            50% { height: 25px; }
+            100% { height: 5px; }
+        }
     </style>
 </head>
 <body>
@@ -138,7 +200,17 @@
             <h2>The Sous Chef</h2>
         </div>
     </div>
-    <button id="start-button">Start Kitchen Assistant</button>
+    <div class="controls-container">
+        <button id="start-button">Start Kitchen Assistant</button>
+        <div id="sound-waves" class="sound-waves hidden">
+            <div class="bar green"></div>
+            <div class="bar green"></div>
+            <div class="bar white"></div>
+            <div class="bar white"></div>
+            <div class="bar red"></div>
+            <div class="bar red"></div>
+        </div>
+    </div>
     <div id="status">Not connected</div>
     <div id="chat-log"></div>
     <div id="input-container">
@@ -275,6 +347,13 @@
                     audioQueue.push(int16Array);
                     playNext();
                 }
+                else if (data.type === 'waves') {
+                    if (data.action === 'show') {
+                        showSoundWaves();
+                    } else if (data.action === 'hide') {
+                        hideSoundWaves();
+                    }
+                }
             };
         }
 
@@ -347,6 +426,14 @@
                 recordButton.textContent = '🎤';
                 console.log('Recording stopped');
             }
+        }
+
+        function showSoundWaves() {
+            document.getElementById('sound-waves').classList.remove('hidden');
+        }
+
+        function hideSoundWaves() {
+            document.getElementById('sound-waves').classList.add('hidden');
         }
     </script>
 </body>

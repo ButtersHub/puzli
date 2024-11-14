@@ -75,7 +75,7 @@ function createWavHeader(pcmDataLength) {
     return header;
 }
 
-async function playCompleteAudio(audioChunks) {
+async function playCompleteAudio(audioChunks, ws) {
     const completeBuffer = Buffer.concat(audioChunks);
     const wavHeader = createWavHeader(completeBuffer.length);
     const wavFile = Buffer.concat([wavHeader, completeBuffer]);
@@ -91,6 +91,7 @@ async function playCompleteAudio(audioChunks) {
                     console.error('Error playing audio:', err);
                     reject(err);
                 } else {
+                    ws.send(JSON.stringify({ type: 'waves', action: 'hide' }));
                     resolve();
                 }
                 // Clean up temp file
@@ -103,6 +104,7 @@ async function playCompleteAudio(audioChunks) {
         });
     } catch (error) {
         console.error('Error playing audio:', error);
+        ws.send(JSON.stringify({ type: 'waves', action: 'hide' }));
     }
 }
 
@@ -285,6 +287,7 @@ wss.on('connection', async (ws) => {
                     isCollectingAudio = true;
                     const audioBuffer = Buffer.from(response.delta, 'base64');
                     audioChunks.push(audioBuffer);
+                    ws.send(JSON.stringify({ type: 'waves', action: 'show' }));
                 }
             }
             // Handle audio transcript
@@ -298,8 +301,8 @@ wss.on('connection', async (ws) => {
             else if (response.type === 'response.done') {
                 if (isCollectingAudio && audioChunks.length > 0) {
                     console.log('Response complete, playing full audio...');
-                    playCompleteAudio(audioChunks);
-                    audioChunks = []; // Reset for next audio stream
+                    playCompleteAudio(audioChunks, ws);
+                    audioChunks = [];
                     isCollectingAudio = false;
                 }
             }
